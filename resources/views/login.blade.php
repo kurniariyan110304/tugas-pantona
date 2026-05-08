@@ -24,12 +24,12 @@
 
                     <div class="mb-3">
                         <label>Email</label>
-                        <input type="email" id="email" class="form-control" placeholder="Masukkan email">
+                        <input type="email" id="email" class="form-control" placeholder="admin@gmail.com">
                     </div>
 
                     <div class="mb-3">
                         <label>Password</label>
-                        <input type="password" id="password" class="form-control" placeholder="Masukkan password">
+                        <input type="password" id="password" class="form-control" placeholder="admin123">
                     </div>
 
                     <button type="button" id="btn-login" class="btn btn-primary w-100">
