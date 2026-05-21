@@ -8,6 +8,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <link href="https://cdn.datatables.net/2.0.8/css/dataTables.bootstrap5.css" rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 </head>
 
 <body>
@@ -35,23 +37,40 @@
             <div class="row">
                 <div class="col-md-4 mb-3">
                     <label>Email</label>
-                    <input type="email" id="email" class="form-control" placeholder="Email">
+                    <input type="text" id="email" class="form-control" placeholder="Email">
+                    <small class="text-danger error-message" id="error-email"></small>
                 </div>
 
                 <div class="col-md-4 mb-3">
                     <label>Nama</label>
                     <input type="text" id="nama" class="form-control" placeholder="Nama">
+                    <small class="text-danger error-message" id="error-nama"></small>
                 </div>
 
                 <div class="col-md-4 mb-3">
                     <label>Password</label>
-                    <input type="password" id="password" class="form-control" placeholder="Password">
-                    <small id="password-help" class="text-muted">Password wajib diisi saat tambah user.</small>
+
+                    <div class="position-relative">
+                        <input type="password" id="password" class="form-control pe-5" placeholder="Password">
+
+                        <span id="toggle-user-password"
+                              class="position-absolute top-50 end-0 translate-middle-y me-3"
+                              style="cursor: pointer;">
+                            <i class="bi bi-eye-slash" id="icon-user-password"></i>
+                        </span>
+                    </div>
+
+                    <small id="password-help" class="text-muted">
+                        Password wajib diisi saat tambah user.
+                    </small>
+                    <br>
+                    <small class="text-danger error-message" id="error-password"></small>
                 </div>
 
                 <div class="col-md-4 mb-3">
                     <label>Image Profile</label>
                     <input type="file" id="image" class="form-control" accept="image/*">
+                    <small class="text-danger error-message" id="error-image"></small>
                 </div>
             </div>
 
@@ -114,15 +133,19 @@ $(document).ready(function () {
         ]
     });
 
-    function resetForm() {
-        $('#user_id').val('');
-        $('#email').val('');
-        $('#nama').val('');
-        $('#password').val('');
-        $('#image').val('');
-        $('#form-title').text('Tambah User');
-        $('#btn-save').text('Simpan');
-        $('#password-help').text('Password wajib diisi saat tambah user.');
+    function clearError(field) {
+        $('#error-' + field).text('');
+        $('#' + field).removeClass('is-invalid');
+    }
+
+    function showError(field, message) {
+        $('#error-' + field).text(message);
+        $('#' + field).addClass('is-invalid');
+    }
+
+    function clearAllErrors() {
+        $('.error-message').text('');
+        $('.form-control').removeClass('is-invalid');
     }
 
     function showMessage(type, message) {
@@ -134,7 +157,55 @@ $(document).ready(function () {
         `);
     }
 
+    function resetForm() {
+        $('#user_id').val('');
+        $('#email').val('');
+        $('#nama').val('');
+        $('#password').val('');
+        $('#image').val('');
+
+        $('#form-title').text('Tambah User');
+        $('#btn-save').text('Simpan');
+        $('#password-help').text('Password wajib diisi saat tambah user.');
+
+        $('#password').attr('type', 'password');
+        $('#icon-user-password').removeClass('bi-eye').addClass('bi-eye-slash');
+
+        clearAllErrors();
+    }
+
+    $('#email').on('input', function () {
+        clearError('email');
+    });
+
+    $('#nama').on('input', function () {
+        clearError('nama');
+    });
+
+    $('#password').on('input', function () {
+        clearError('password');
+    });
+
+    $('#image').on('change', function () {
+        clearError('image');
+    });
+
+    $('#toggle-user-password').on('click', function () {
+        let passwordInput = $('#password');
+        let icon = $('#icon-user-password');
+
+        if (passwordInput.attr('type') === 'password') {
+            passwordInput.attr('type', 'text');
+            icon.removeClass('bi-eye-slash').addClass('bi-eye');
+        } else {
+            passwordInput.attr('type', 'password');
+            icon.removeClass('bi-eye').addClass('bi-eye-slash');
+        }
+    });
+
     $('#btn-save').on('click', function () {
+        clearAllErrors();
+
         let userId = $('#user_id').val();
 
         let formData = new FormData();
@@ -165,21 +236,27 @@ $(document).ready(function () {
                 table.ajax.reload(null, false);
             },
             error: function (xhr) {
-                let message = 'Terjadi kesalahan';
+                if (xhr.status === 422) {
+                    let errors = xhr.responseJSON.errors;
 
-                if (xhr.responseJSON && xhr.responseJSON.message) {
-                    message = xhr.responseJSON.message;
+                    if (errors.email) {
+                        showError('email', errors.email[0]);
+                    }
+
+                    if (errors.nama) {
+                        showError('nama', errors.nama[0]);
+                    }
+
+                    if (errors.password) {
+                        showError('password', errors.password[0]);
+                    }
+
+                    if (errors.image) {
+                        showError('image', errors.image[0]);
+                    }
+                } else {
+                    showMessage('danger', 'Terjadi kesalahan pada server.');
                 }
-
-                if (xhr.responseJSON && xhr.responseJSON.errors) {
-                    message = '';
-
-                    $.each(xhr.responseJSON.errors, function (key, value) {
-                        message += value[0] + '<br>';
-                    });
-                }
-
-                showMessage('danger', message);
             },
             complete: function () {
                 $('#btn-save').text(userId ? 'Update' : 'Simpan').prop('disabled', false);
@@ -189,6 +266,8 @@ $(document).ready(function () {
 
     $('#user-table').on('click', '.btn-edit', function () {
         let id = $(this).data('id');
+
+        clearAllErrors();
 
         $.ajax({
             url: "/users/edit/" + id,
@@ -206,10 +285,16 @@ $(document).ready(function () {
                 $('#btn-save').text('Update');
                 $('#password-help').text('Kosongkan password jika tidak ingin diubah.');
 
+                $('#password').attr('type', 'password');
+                $('#icon-user-password').removeClass('bi-eye').addClass('bi-eye-slash');
+
                 window.scrollTo({
                     top: 0,
                     behavior: 'smooth'
                 });
+            },
+            error: function () {
+                showMessage('danger', 'Gagal mengambil data user.');
             }
         });
     });
@@ -229,7 +314,7 @@ $(document).ready(function () {
                 table.ajax.reload(null, false);
             },
             error: function () {
-                showMessage('danger', 'User gagal dihapus');
+                showMessage('danger', 'User gagal dihapus.');
             }
         });
     });
@@ -244,6 +329,9 @@ $(document).ready(function () {
             type: "POST",
             success: function (response) {
                 window.location.href = response.redirect;
+            },
+            error: function () {
+                showMessage('danger', 'Logout gagal.');
             }
         });
     });

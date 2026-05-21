@@ -7,6 +7,7 @@ use App\Models\CmsUser;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\File;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
@@ -78,33 +79,67 @@ class UserController extends Controller
     }
 
     public function store(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email|unique:cms_users,email',
-            'nama' => 'required',
-            'password' => 'required',
-            'image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
-        ]);
+{
+    $validator = Validator::make($request->all(), [
+        'email' => 'required|email|unique:cms_users,email',
+        'nama' => 'required|string|max:255',
+        'password' => 'required|string|min:6',
+        'image' => 'nullable|file|mimes:jpg,jpeg,png|max:2048',
+    ], [
+        'email.required' => 'Email wajib diisi.',
+        'email.email' => 'Format email tidak valid.',
+        'email.unique' => 'Email sudah digunakan.',
 
-        $imageName = null;
+        'nama.required' => 'Nama wajib diisi.',
+        'nama.string' => 'Nama harus berupa teks.',
+        'nama.max' => 'Nama maksimal 255 karakter.',
 
+        'password.required' => 'Password wajib diisi.',
+        'password.string' => 'Password harus berupa teks.',
+        'password.min' => 'Password minimal 6 karakter.',
+
+        'image.file' => 'File profile tidak valid.',
+        'image.mimes' => 'Image profile harus berformat JPG, JPEG, atau PNG.',
+        'image.max' => 'Ukuran image profile maksimal 2MB.',
+    ]);
+
+    $validator->after(function ($validator) use ($request) {
         if ($request->hasFile('image')) {
-            $imageName = time() . '_' . rand(1000, 9999) . '.' . $request->image->extension();
-            $request->image->move(public_path('uploads/profile'), $imageName);
+            if (!$this->isRealImage($request->file('image'))) {
+                $validator->errors()->add(
+                    'image',
+                    'File yang diupload bukan image asli. Jangan hanya mengganti extension file menjadi .jpg, .jpeg, atau .png.'
+                );
+            }
         }
+    });
 
-        CmsUser::create([
-            'email' => $request->email,
-            'nama' => $request->nama,
-            'password' => Hash::make($request->password),
-            'image' => $imageName,
-        ]);
-
+    if ($validator->fails()) {
         return response()->json([
-            'status' => true,
-            'message' => 'User berhasil dibuat'
-        ]);
+            'status' => false,
+            'errors' => $validator->errors()
+        ], 422);
     }
+
+    $imageName = null;
+
+    if ($request->hasFile('image')) {
+        $imageName = time() . '_' . rand(1000, 9999) . '.' . $request->image->extension();
+        $request->image->move(public_path('uploads/profile'), $imageName);
+    }
+
+    CmsUser::create([
+        'email' => $request->email,
+        'nama' => $request->nama,
+        'password' => Hash::make($request->password),
+        'image' => $imageName,
+    ]);
+
+    return response()->json([
+        'status' => true,
+        'message' => 'User berhasil dibuat.'
+    ]);
+}
 
     public function edit($id)
     {
@@ -117,46 +152,79 @@ class UserController extends Controller
     }
 
     public function update(Request $request, $id)
-    {
-        $user = CmsUser::findOrFail($id);
+{
+    $user = CmsUser::findOrFail($id);
 
-        $request->validate([
-            'email' => [
-                'required',
-                'email',
-                Rule::unique('cms_users', 'email')->ignore($user->id),
-            ],
-            'nama' => 'required',
-            'password' => 'nullable',
-            'image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
-        ]);
+    $validator = Validator::make($request->all(), [
+        'email' => [
+            'required',
+            'email',
+            Rule::unique('cms_users', 'email')->ignore($user->id),
+        ],
+        'nama' => 'required|string|max:255',
+        'password' => 'nullable|string|min:6',
+        'image' => 'nullable|file|mimes:jpg,jpeg,png|max:2048',
+    ], [
+        'email.required' => 'Email wajib diisi.',
+        'email.email' => 'Format email tidak valid.',
+        'email.unique' => 'Email sudah digunakan.',
 
-        $imageName = $user->image;
+        'nama.required' => 'Nama wajib diisi.',
+        'nama.string' => 'Nama harus berupa teks.',
+        'nama.max' => 'Nama maksimal 255 karakter.',
 
+        'password.string' => 'Password harus berupa teks.',
+        'password.min' => 'Password minimal 6 karakter.',
+
+        'image.file' => 'File profile tidak valid.',
+        'image.mimes' => 'Image profile harus berformat JPG, JPEG, atau PNG.',
+        'image.max' => 'Ukuran image profile maksimal 2MB.',
+    ]);
+
+    $validator->after(function ($validator) use ($request) {
         if ($request->hasFile('image')) {
-            if ($user->image && File::exists(public_path('uploads/profile/' . $user->image))) {
-                File::delete(public_path('uploads/profile/' . $user->image));
+            if (!$this->isRealImage($request->file('image'))) {
+                $validator->errors()->add(
+                    'image',
+                    'File yang diupload bukan image asli. Jangan hanya mengganti extension file menjadi .jpg, .jpeg, atau .png.'
+                );
             }
-
-            $imageName = time() . '_' . rand(1000, 9999) . '.' . $request->image->extension();
-            $request->image->move(public_path('uploads/profile'), $imageName);
         }
+    });
 
-        $user->email = $request->email;
-        $user->nama = $request->nama;
-        $user->image = $imageName;
-
-        if (!empty($request->password)) {
-            $user->password = Hash::make($request->password);
-        }
-
-        $user->save();
-
+    if ($validator->fails()) {
         return response()->json([
-            'status' => true,
-            'message' => 'User berhasil diupdate'
-        ]);
+            'status' => false,
+            'errors' => $validator->errors()
+        ], 422);
     }
+
+    $imageName = $user->image;
+
+    if ($request->hasFile('image')) {
+        if ($user->image && File::exists(public_path('uploads/profile/' . $user->image))) {
+            File::delete(public_path('uploads/profile/' . $user->image));
+        }
+
+        $imageName = time() . '_' . rand(1000, 9999) . '.' . $request->image->extension();
+        $request->image->move(public_path('uploads/profile'), $imageName);
+    }
+
+    $user->email = $request->email;
+    $user->nama = $request->nama;
+    $user->image = $imageName;
+
+    if (!empty($request->password)) {
+        $user->password = Hash::make($request->password);
+    }
+
+    $user->save();
+
+    return response()->json([
+        'status' => true,
+        'message' => 'User berhasil diupdate.'
+    ]);
+}
 
     public function destroy($id)
     {
@@ -172,5 +240,29 @@ class UserController extends Controller
             'status' => true,
             'message' => 'User berhasil dihapus'
         ]);
+    }
+
+    public function isRealImage($file): bool{
+        if (!$file){
+            return true;
+        }
+
+        $allowedMimeTypes = [
+            'image/jpeg',
+            'image/png'
+        ];
+
+        $realMimeType = $file->getMimeType();
+        if (!in_array($realMimeType, $allowedMimeTypes)){
+            return false;
+        }
+
+        $imageInfo = @getimagesize($file->getPathname());
+
+        if($imageInfo === false) {
+            return false;
+        }
+
+        return true;
     }
 }
